@@ -1,11 +1,11 @@
 {
-  "name": "peerjs",
+  "name": "peercdn",
   "version": "0.3.14",
-  "description": "PeerJS client",
-  "main": "./lib/peer.js",
+  "description": "Peercdn client. Based on PeerJS",
+  "main": "./lib/peercdn.js",
   "repository": {
     "type": "git",
-    "url": "git://github.com/peers/peerjs.git"
+    "url": "https://github.com/pingvinux/peerjs.git"
   },
   "author": "Michelle Bu, Eric Zhang",
   "license": "MIT",

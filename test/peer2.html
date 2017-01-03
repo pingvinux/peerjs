@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Peerloader try</title>
+    <script src="../dist/peerloader.js"></script>
+</head>
+<body>
+
+<h1>Peerloader try</h1>
+<p>
+    <a id="add-peer" href="">Add peer</a>
+</p>
+<p>
+    <video id="file-video" width="640" height="360" controls autoplay>
+    </video>
+</p>
+<p>
+    <a id="file-link" href="#">This file</a>
+</p>
+
+<script>
+    window.MediaSource = window.MediaSource || window.WebKitMediaSource;
+    if (!!!window.MediaSource) {
+        alert('MediaSource API is not available');
+    }
+
+    var trakerOptions = {
+        key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJma3kiOiJ0ZXN0IiwibmJmIjoxNDQ0NDc4NDAwLCJ2cnMiOjF9.WxG-DSVFqJVLrI9FPy06j1A0uAb-LovdmzToSwUAkHA',
+        host: '127.0.0.1',
+        port: 8888,
+        //debug: true
+    };
+    var peerFile = new PeerFile('simple', 'http://peerloader.dev/video/magicans_trailer_enc2.mp4');
+
+
+    // create file link
+    var file = document.getElementById('file-link');
+
+    // create video
+    var mediaSource = new MediaSource();
+    var video = document.getElementById('file-video');
+    video.src = window.URL.createObjectURL(mediaSource);
+
+
+    var callback = function() {
+        // When file load info - create mediaSource buffer
+        peerFile.on('init', function() {
+            console.log(this);
+
+            var sourceBuffer = mediaSource.addSourceBuffer('video/mp4; codecs="avc1.4D401E, mp4a.40.2"');
+            var segmentsCount = this.segments.length;
+
+            peerFile.on('nextsegment', function(segmentIndex, segmentData){
+                console.log('nextsegment ('+segmentIndex+') length='+segmentData.byteLength, segmentData);
+
+                try {
+                    sourceBuffer.appendBuffer(new Uint8Array(segmentData));
+                    if (segmentIndex == segmentsCount - 1) {
+                        mediaSource.endOfStream();
+                    } else if (video.paused) {
+                        video.play();
+                    }
+                } catch(e) {
+                    console.log(e)
+                }
+            });
+            peerFile.on('load', function(){
+                var tmp = [];
+                for(var i=0; i <this.segments.length;i++) {
+                    tmp.push(new Blob([new Uint8Array(this.segments[i].data)], {type: this.type}));
+                }
+                var blob = new Blob(tmp, {type: this.type});
+                var dataUrl = URL.createObjectURL(blob);
+
+                file.href = dataUrl;            })
+        });
+
+        var peerLoader = new PeerLoader(trakerOptions);
+        peerLoader.load(peerFile);
+    };
+    mediaSource.addEventListener('sourceopen', callback, false);
+    mediaSource.addEventListener('webkitsourceopen', callback, false);
+    mediaSource.addEventListener('webkitsourceended', function(e) {
+        console.log('mediaSource readyState: ' + this.readyState);
+    }, false);
+
+</script>
+
+</body>
+</html>

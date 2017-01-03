@@ -1,4 +1,4 @@
-/*! peerjs build:0.3.14, development. Copyright(c) 2013 Michelle Bu <michelle@michellebu.com> */(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+/*! peercdn build:0.3.14, development. Copyright(c) 2013 Michelle Bu <michelle@michellebu.com> */(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 module.exports.RTCSessionDescription = window.RTCSessionDescription ||
 	window.mozRTCSessionDescription;
 module.exports.RTCPeerConnection = window.RTCPeerConnection ||
@@ -257,6 +257,8 @@ DataConnection.prototype._sendChunks = function(blob) {
 DataConnection.prototype.handleMessage = function(message) {
   var payload = message.payload;
 
+  util.log('DataConnection message: ', message);
+
   switch (message.type) {
     case 'ANSWER':
       this._peerBrowser = payload.browser;
@@ -271,15 +273,22 @@ DataConnection.prototype.handleMessage = function(message) {
       util.warn('Unrecognized message type:', message.type, 'from peer:', this.peer);
       break;
   }
-}
+};
 
 module.exports = DataConnection;
 
-},{"./negotiator":5,"./util":8,"eventemitter3":9,"reliable":12}],3:[function(require,module,exports){
+},{"./negotiator":4,"./util":8,"eventemitter3":9,"reliable":12}],3:[function(require,module,exports){
+
 window.Socket = require('./socket');
-window.MediaConnection = require('./mediaconnection');
 window.DataConnection = require('./dataconnection');
 window.Peer = require('./peer');
+
+
+var exp = require('./peerloader');
+window.PeerLoader = exp.PeerLoader;
+window.PeerFile = exp.PeerFile;
+
+
 window.RTCPeerConnection = require('./adapter').RTCPeerConnection;
 window.RTCSessionDescription = require('./adapter').RTCSessionDescription;
 window.RTCIceCandidate = require('./adapter').RTCIceCandidate;
@@ -287,104 +296,7 @@ window.Negotiator = require('./negotiator');
 window.util = require('./util');
 window.BinaryPack = require('js-binarypack');
 
-},{"./adapter":1,"./dataconnection":2,"./mediaconnection":4,"./negotiator":5,"./peer":6,"./socket":7,"./util":8,"js-binarypack":10}],4:[function(require,module,exports){
-var util = require('./util');
-var EventEmitter = require('eventemitter3');
-var Negotiator = require('./negotiator');
-
-/**
- * Wraps the streaming interface between two Peers.
- */
-function MediaConnection(peer, provider, options) {
-  if (!(this instanceof MediaConnection)) return new MediaConnection(peer, provider, options);
-  EventEmitter.call(this);
-
-  this.options = util.extend({}, options);
-
-  this.open = false;
-  this.type = 'media';
-  this.peer = peer;
-  this.provider = provider;
-  this.metadata = this.options.metadata;
-  this.localStream = this.options._stream;
-
-  this.id = this.options.connectionId || MediaConnection._idPrefix + util.randomToken();
-  if (this.localStream) {
-    Negotiator.startConnection(
-      this,
-      {_stream: this.localStream, originator: true}
-    );
-  }
-};
-
-util.inherits(MediaConnection, EventEmitter);
-
-MediaConnection._idPrefix = 'mc_';
-
-MediaConnection.prototype.addStream = function(remoteStream) {
-  util.log('Receiving stream', remoteStream);
-
-  this.remoteStream = remoteStream;
-  this.emit('stream', remoteStream); // Should we call this `open`?
-
-};
-
-MediaConnection.prototype.handleMessage = function(message) {
-  var payload = message.payload;
-
-  switch (message.type) {
-    case 'ANSWER':
-      // Forward to negotiator
-      Negotiator.handleSDP(message.type, this, payload.sdp);
-      this.open = true;
-      break;
-    case 'CANDIDATE':
-      Negotiator.handleCandidate(this, payload.candidate);
-      break;
-    default:
-      util.warn('Unrecognized message type:', message.type, 'from peer:', this.peer);
-      break;
-  }
-}
-
-MediaConnection.prototype.answer = function(stream) {
-  if (this.localStream) {
-    util.warn('Local stream already exists on this MediaConnection. Are you answering a call twice?');
-    return;
-  }
-
-  this.options._payload._stream = stream;
-
-  this.localStream = stream;
-  Negotiator.startConnection(
-    this,
-    this.options._payload
-  )
-  // Retrieve lost messages stored because PeerConnection not set up.
-  var messages = this.provider._getMessages(this.id);
-  for (var i = 0, ii = messages.length; i < ii; i += 1) {
-    this.handleMessage(messages[i]);
-  }
-  this.open = true;
-};
-
-/**
- * Exposed functionality for users.
- */
-
-/** Allows user to close connection. */
-MediaConnection.prototype.close = function() {
-  if (!this.open) {
-    return;
-  }
-  this.open = false;
-  Negotiator.cleanup(this);
-  this.emit('close')
-};
-
-module.exports = MediaConnection;
-
-},{"./negotiator":5,"./util":8,"eventemitter3":9}],5:[function(require,module,exports){
+},{"./adapter":1,"./dataconnection":2,"./negotiator":4,"./peer":5,"./peerloader":6,"./socket":7,"./util":8,"js-binarypack":10}],4:[function(require,module,exports){
 var util = require('./util');
 var RTCPeerConnection = require('./adapter').RTCPeerConnection;
 var RTCSessionDescription = require('./adapter').RTCSessionDescription;
@@ -407,11 +319,6 @@ Negotiator._idPrefix = 'pc_';
 /** Returns a PeerConnection object set up correctly (for data, media). */
 Negotiator.startConnection = function(connection, options) {
   var pc = Negotiator._getPeerConnection(connection, options);
-
-  if (connection.type === 'media' && options._stream) {
-    // Add the stream.
-    pc.addStream(options._stream);
-  }
 
   // Set the connection's PC.
   connection.pc = connection.peerConnection = pc;
@@ -572,22 +479,6 @@ Negotiator._setupListeners = function(connection, pc, pc_id) {
     var connection = provider.getConnection(peerId, connectionId);
     connection.initialize(dc);
   };
-
-  // MEDIACONNECTION.
-  util.log('Listening for remote stream');
-  pc.onaddstream = function(evt) {
-    util.log('Received remote stream');
-    var stream = evt.stream;
-    var connection = provider.getConnection(peerId, connectionId);
-    // 10/10/2014: looks like in Chrome 38, onaddstream is triggered after
-    // setting the remote description. Our connection object in these cases
-    // is actually a DATA connection, so addStream fails.
-    // TODO: This is hopefully just a temporary fix. We should try to
-    // understand why this is happening.
-    if (connection.type === 'media') {
-      connection.addStream(stream);
-    }
-  };
 }
 
 Negotiator.cleanup = function(connection) {
@@ -699,11 +590,10 @@ Negotiator.handleCandidate = function(connection, ice) {
 
 module.exports = Negotiator;
 
-},{"./adapter":1,"./util":8}],6:[function(require,module,exports){
+},{"./adapter":1,"./util":8}],5:[function(require,module,exports){
 var util = require('./util');
 var EventEmitter = require('eventemitter3');
 var Socket = require('./socket');
-var MediaConnection = require('./mediaconnection');
 var DataConnection = require('./dataconnection');
 
 /**
@@ -759,7 +649,7 @@ function Peer(id, options) {
 
   // Sanity checks
   // Ensure WebRTC supported
-  if (!util.supports.audioVideo && !util.supports.data ) {
+  if (!util.supports.data ) {
     this._delayedAbort('browser-incompatible', 'The current browser does not support WebRTC');
     return;
   }
@@ -773,13 +663,7 @@ function Peer(id, options) {
     this._delayedAbort('invalid-key', 'API KEY "' + options.key + '" is invalid');
     return;
   }
-  // Ensure not using unsecure cloud server on SSL page
-  if (options.secure && options.host === '0.peerjs.com') {
-    this._delayedAbort('ssl-unavailable',
-      'The cloud server currently does not support HTTPS. Please run your own PeerServer to use HTTPS.');
-    return;
-  }
-  //
+
 
   // States.
   this.destroyed = false; // Connections have been killed
@@ -878,6 +762,8 @@ Peer.prototype._handleMessage = function(message) {
   var peer = message.src;
   var connection;
 
+  util.log('_handleMessage', message);
+
   switch (type) {
     case 'OPEN': // The connection to the server is open.
       this.emit('open', this.id);
@@ -911,15 +797,7 @@ Peer.prototype._handleMessage = function(message) {
         //connection.handleMessage(message);
       } else {
         // Create a new connection.
-        if (payload.type === 'media') {
-          connection = new MediaConnection(peer, this, {
-            connectionId: connectionId,
-            _payload: payload,
-            metadata: payload.metadata
-          });
-          this._addConnection(peer, connection);
-          this.emit('call', connection);
-        } else if (payload.type === 'data') {
+        if (payload.type === 'data') {
           connection = new DataConnection(peer, this, {
             connectionId: connectionId,
             _payload: payload,
@@ -940,6 +818,12 @@ Peer.prototype._handleMessage = function(message) {
           connection.handleMessage(messages[i]);
         }
       }
+      break;
+    case 'PEERS':
+      this.emit('peers', payload);
+      break;
+    case 'SEGMENTS':
+      this.emit('segments', payload);
       break;
     default:
       if (!payload) {
@@ -998,29 +882,6 @@ Peer.prototype.connect = function(peer, options) {
   var connection = new DataConnection(peer, this, options);
   this._addConnection(peer, connection);
   return connection;
-};
-
-/**
- * Returns a MediaConnection to the specified peer. See documentation for a
- * complete list of options.
- */
-Peer.prototype.call = function(peer, stream, options) {
-  if (this.disconnected) {
-    util.warn('You cannot connect to a new Peer because you called ' +
-      '.disconnect() on this Peer and ended your connection with the ' +
-      'server. You can create a new Peer to reconnect.');
-    this.emitError('disconnected', 'Cannot connect to new Peer after disconnecting from server.');
-    return;
-  }
-  if (!stream) {
-    util.error('To call a peer, you must provide a stream from your browser\'s `getUserMedia`.');
-    return;
-  }
-  options = options || {};
-  options._stream = stream;
-  var call = new MediaConnection(peer, this, options);
-  this._addConnection(peer, call);
-  return call;
 };
 
 /** Add a data/media connection to this peer. */
@@ -1098,6 +959,7 @@ Peer.prototype._cleanup = function() {
     var peers = Object.keys(this.connections);
     for (var i = 0, ii = peers.length; i < ii; i++) {
       this._cleanupPeer(peers[i]);
+      this._cleanupSegments(peers[i]);
     }
   }
   this.emit('close');
@@ -1177,14 +1039,6 @@ Peer.prototype.listAllPeers = function(cb) {
       return;
     }
     if (http.status === 401) {
-      var helpfulError = '';
-      if (self.options.host !== util.CLOUD_HOST) {
-        helpfulError = 'It looks like you\'re using the cloud server. You can email ' +
-          'team@peerjs.com to enable peer listing for your API key.';
-      } else {
-        helpfulError = 'You need to enable `allow_discovery` on your self-hosted ' +
-          'PeerServer to use this feature.';
-      }
       cb([]);
       throw new Error('It doesn\'t look like you have permission to list peers IDs. ' + helpfulError);
     } else if (http.status !== 200) {
@@ -1196,9 +1050,478 @@ Peer.prototype.listAllPeers = function(cb) {
   http.send(null);
 };
 
+Peer.prototype.updateSegments = function(segments) {
+    this.socket.send({
+      type: 'SEGMENTS',
+      payload: segments
+    });
+};
+
 module.exports = Peer;
 
-},{"./dataconnection":2,"./mediaconnection":4,"./socket":7,"./util":8,"eventemitter3":9}],7:[function(require,module,exports){
+},{"./dataconnection":2,"./socket":7,"./util":8,"eventemitter3":9}],6:[function(require,module,exports){
+var util = require('./util');
+var EventEmitter = require('eventemitter3');
+var Peer = require('./peer');
+
+var simpleSegmentLength = 1024*1024;
+
+function PeerFile(sourceType, src, type) {
+    this.sourceType = sourceType;
+    this.src = src;
+    this.type = type;
+    this.size = 0;
+    this.segments = [];
+    this.nextsegment = 0;
+
+    this._aborted = false;
+    EventEmitter.call(this);
+}
+
+util.inherits(PeerFile, EventEmitter);
+
+PeerFile.prototype.init = function() {
+   this._loadSegmentsList();
+};
+
+PeerFile.prototype.getLoaderSegments = function() {
+    var segments = [];
+    if(this.segments.length > 0) {
+        for(var i=0; i<this.segments.length; i++) {
+            var s = this.segments[i];
+            if(s.data) {
+                segments.push(s.id);
+            }
+        }
+    }
+
+    return segments;
+};
+
+PeerFile.prototype._loadSegmentsList = function() {
+    var self = this;
+    var err = null;
+
+    if(self.sourceType == "simple") {
+        var xhr = new XMLHttpRequest();
+
+        if(window.location.host != util.httpUrlHost(self.src)) {
+            xhr.withCredentials = true;
+        }
+        xhr.open('HEAD', self.src, true);
+        xhr.onload = function () {
+            var headers_all = util.httpParseHeaders(xhr.getAllResponseHeaders());
+            if(headers_all == false) {
+                return;
+            }
+
+            self.type = headers_all['Content-Type'];
+            self.size = parseInt(headers_all['Content-Length'], 10);
+
+            var indx = 0;
+            for(var i=0;i<self.size;i+=simpleSegmentLength) {
+                var segment = {
+                    'i': indx,
+                    'id': 's' + i,
+                    'range': [i, Math.min(i+simpleSegmentLength-1, self.size)],
+                    'data': null
+                };
+                self.segments.push(segment);
+                indx += 1;
+            }
+
+            self.emit('init');
+        };
+        xhr.onerror = function() {
+            err = util.error('HTTP error. Status: ' + xhr.status + ' Message: ' + xhr.statusText);
+            self.emit('error', err);
+        };
+        xhr.send();
+    }
+    return err;
+};
+
+PeerFile.prototype._setSegmentData = function(indx, data) {
+  if(this.segments[indx] != undefined) {
+      this.segments[indx].data = data;
+
+      var segmentsLen = this.segments.length;
+      var segmentsLoaded = 0;
+      for(var i=0;i<segmentsLen;i++) {
+          var segment = this.segments[i];
+          if(segment.data) {
+              segmentsLoaded++;
+
+              if(i == this.nextsegment) {
+                  this.emit('nextsegment', i, segment.data);
+                  this.nextsegment++;
+              }
+          }
+      }
+
+      if(segmentsLoaded == segmentsLen) {
+          this.emit('load');
+      }
+  }
+};
+
+PeerFile.prototype._getSegmentData = function(segmentId) {
+    for(var i=0;i<this.segments.length;i++) {
+        var segment = this.segments[i];
+        if(segment.id == segmentId) {
+            if(segment.data) {
+                return segment.data
+            } else {
+                return false;
+            }
+        }
+    }
+    return false;
+}
+
+/*
+
+ */
+function PeerLoader(options) {
+    if (!(this instanceof PeerLoader)) return new PeerLoader(options);
+    EventEmitter.call(this);
+
+    this.options = options;
+    this.peerList = {};
+    this.peerPool = {};
+    this.peerSegments = {};
+    this.requestQueue = {};
+
+    this.peerFile = null;
+}
+
+util.inherits(PeerLoader, EventEmitter);
+
+PeerLoader.prototype.load = function(peerFile) {
+    var self = this;
+
+    if(peerFile.constructor !== PeerFile) {
+        self.emitError('FileObject', 'Input parameter mast be PeerFile type');
+        return;
+    }
+    peerFile.on('error', function(err) {
+        self._abort(err)
+    });
+    peerFile.init();
+
+    if(self._aborted) {
+        return;
+    }
+
+
+    this.peer = new Peer(this.options);
+    this.peer.on('close', function(){
+    });
+    this.peer.on('connection', function(conn) {
+        self._addPeer(conn);
+    });
+    this.peer.on('peers', function(peers) {
+        self._updatePeers(peers);
+    });
+    this.peer.on('segments', function(segments) {
+        util.log('Update segments', segments);
+        self._updateSegments(segments);
+    });
+
+    this.peerFile = peerFile;
+    this.peerFile.on('init', function(){
+        var allSegments = peerFile.segments.slice();
+
+        self.on('loadsegment', function(){
+            var segment = allSegments.shift();
+            var cb = function(data, err) {
+                if(!self.peerFile) {
+                    return
+                }
+                if(err) {
+                    allSegments.push(segment);
+
+                    self.emitError(err);
+                    return;
+                }
+
+                util.log('PeerLoader. Load-segment callback', data, err);
+
+                self.peerFile._setSegmentData(segment.i, data);
+
+                util.log(self.peerFile);
+                util.log(self.peerFile.getLoaderSegments());
+
+                self.peer.updateSegments(self.peerFile.getLoaderSegments());
+
+                if(allSegments.length == 0) {
+                    util.log('PeerLoader. Load last segment');
+                } else {
+                    self.emit('loadsegment');
+                }
+            };
+
+            var peers = this._getSegmentPeer(segment.id);
+            if(!peers || peers.length == 0) {
+                this._loadByHttp(segment, cb);
+            } else {
+                this._loadByPeer(segment, peers, cb);
+            }
+        });
+        self.emit('loadsegment');
+    });
+
+
+};
+
+PeerLoader.prototype._getPeer = function(peerId, cb) {
+    var self = this;
+
+    if(self.peerPool[peerId]) {
+        if(self.peerPool[peerId].open) {
+            cb(self.peerPool[peerId]);
+        }
+    } else {
+        conn = self.peer.connect(peerId);
+        conn.on('open', function() {
+            self._addPeer(conn);
+            cb(conn, null);
+        });
+        conn.on('error', function(err){
+            err.type = 'segment-peer';
+            cb(null, err);
+        });
+    }
+};
+
+PeerLoader.prototype._existsPeer = function(peerId) {
+    var ret = false;
+    if(this.peerPool[peerId] != undefined) {
+        ret = true;
+    }
+    return ret;
+};
+
+PeerLoader.prototype._addPeer = function(conn) {
+    var self = this;
+
+    conn.on('data', function(message){
+        var peerId = this.peer;
+        var type = message.type;
+
+        switch(type) {
+            case 'SEGMENT-REQUEST':
+                /*
+                 {
+                 type: 'SEGMENT-REQUEST',
+                 segment: segmentId
+                 }
+                 */
+                var segmentId = message.segment;
+                var segmentData = self.peerFile._getSegmentData(segmentId);
+                var msg = {
+                    type: 'SEGMENT-ANSWER',
+                    segment: segmentId
+                };
+                if(!segmentData) {
+                    msg.error = 'No segment found';
+                } else {
+                    msg.data = segmentData;
+                }
+
+                conn.send(msg);
+                break;
+            case 'SEGMENT-ANSWER':
+                /*
+                 {
+                 type: 'SEGMENT-ANSWER',
+                 segment: segmentId,
+                 error: 'Error text if exists',
+                 data: 'segment data if exists'
+                 }
+                 */
+                if(!self.requestQueue[peerId] || !self.requestQueue[peerId][message.segment]) {
+                    return
+                }
+
+                if(message.error) {
+                    var err = new Error(message.error);
+                    err.type = 'segment-peer';
+
+                    self.requestQueue[peerId][message.segment](null, err);
+                } else {
+                    self.requestQueue[peerId][message.segment](message.data, null);
+                }
+                delete(self.requestQueue[peerId][message.segment]);
+                break;
+        }
+    });
+    conn.on('error', function(error){
+        var peerId = this.peer;
+        if(self.requestQueue[peerId]) {
+            var segments = Object.keys(self.requestQueue[peerId]);
+            for(var i=0;i<segments.length; i ++) {
+                var segmentId = segments[i];
+
+                error.type = 'segment-peer';
+
+                self.requestQueue[peerId][segmentId](null, error);
+            }
+        }
+        self._removePeer(this);
+    });
+    conn.on('close', function() {
+        var peerId = this.peer;
+        if(self.requestQueue[peerId]) {
+            var segments = Object.keys(self.requestQueue[peerId]);
+            for(var i=0;i<segments.length; i ++) {
+                var segmentId = segments[i];
+                var err = new Error('Peer connection closed');
+                err.type = 'segment-peer';
+
+                self.requestQueue[peerId][segmentId](null, err);
+            }
+            delete(self.requestQueue[peerId]);
+        }
+
+        self._removePeer(this);
+    });
+    self.peerPool[conn.peer] = conn;
+};
+
+PeerLoader.prototype._removePeer = function(conn) {
+    if(conn.open) {
+        conn.close();
+    }
+    delete(this.requestQueue[conn.peer]);
+    delete(this.peerPool[conn.peer]);
+};
+
+PeerLoader.prototype._updatePeers = function(peerList) {
+    this.peerList = peerList;
+    this.emit('updatepeers');
+};
+
+PeerLoader.prototype._updateSegments = function(segmentsList) {
+    var tmp = {};
+    var peers = Object.keys(segmentsList);
+    for(var i=0; i<peers.length; i++) {
+        var peerId = peers[i];
+        var segments = segmentsList[peerId];
+
+        if(segments.length > 0) {
+            for(var j=0;j<segments.length;j++) {
+                var segment = segments[j];
+
+                if(!this.peerSegments[segment]) {
+                    this.peerSegments[segment] = [peerId];
+                } else if(this.peerSegments[segment].indexOf(peerId) == -1) {
+                    this.peerSegments[segment].push(peerId);
+                }
+            }
+        }
+    }
+    this.emit('updatesegments');
+};
+
+PeerLoader.prototype._getSegmentPeer = function (segmentId) {
+    if(this.peerSegments[segmentId] == undefined || this.peerSegments[segmentId].length == 0) {
+        return false;
+    }
+    return this.peerSegments[segmentId];
+};
+
+PeerLoader.prototype._loadByPeer = function(segment, peers, cb) {
+    var self = this,
+        segmentId = segment.id;
+
+    peers.sort(function(){
+       return Math.random()*Math.random();
+    });
+
+    var peerId = '';
+    for(var i=0; i<peers.length; i++) {
+        if(self._existsPeer(peers[i])) {
+            peerId = peers[i];
+            break;
+        }
+    }
+    if(!peerId) {
+        peerId = peers[0];
+    }
+
+    var message = {
+        type: 'SEGMENT-REQUEST',
+        segment: segmentId
+    };
+
+    if(self.requestQueue[peerId] == undefined) {
+        self.requestQueue[peerId] = {};
+    }
+    self.requestQueue[peerId][segmentId] = cb;
+
+    self._getPeer(peerId, function(conn, err){
+        if(err != null) {
+            throw err;
+        }
+
+        util.log('Create segment-request. Call peer send', message);
+
+        conn.send(message);
+        setTimeout(function(){
+            if(self.requestQueue[peerId] != undefined && self.requestQueue[peerId][segmentId] != undefined) {
+                var err = new Error('Segment request timeout');
+                err.type = 'segment-peer';
+
+                conn.emit('error', err);
+            }
+        }, 250);
+    });
+};
+
+PeerLoader.prototype._loadByHttp = function(segment, cb) {
+    var byteStart = segment.range[0],
+        byteEnd = segment.range[1];
+
+    var xhr = new XMLHttpRequest();
+    xhr.responseType = 'arraybuffer';
+    xhr.open('GET', this.peerFile.src, true);
+    xhr.setRequestHeader('Range', 'bytes=' + byteStart + '-' + byteEnd);
+    xhr.onload = function() {
+        cb(xhr.response, null);
+    };
+    xhr.onerror = function() {
+        var err = new Error('HTTP error. Status: ' + xhr.status + ' Message: ' + xhr.statusText);
+        err.type = 'segment-http';
+
+        cb(null, err);
+    };
+    xhr.send();
+};
+
+PeerLoader.prototype._abort = function(err) {
+    this._aborted = true;
+
+    if(err != undefined) {
+        this.emitError(err);
+    }
+};
+
+PeerLoader.prototype.emitError = function(type, err) {
+    util.error('Error:', err);
+    if (typeof err === 'string') {
+        err = new Error(err);
+    }
+    err.type = type;
+    this.emit('error', err);
+};
+
+module.exports = {
+    PeerLoader: PeerLoader,
+    PeerFile: PeerFile
+};
+
+},{"./peer":5,"./util":8,"eventemitter3":9}],7:[function(require,module,exports){
 var util = require('./util');
 var EventEmitter = require('eventemitter3');
 
@@ -1596,7 +1919,7 @@ var util = {
 
   validateKey: function(key) {
     // Allow empty keys
-    return !key || /^[A-Za-z0-9]+(?:[ _-][A-Za-z0-9]+)*$/.exec(key);
+    return !key || /^[A-Za-z0-9]+(?:[ _-][A-Za-z0-9]+)*$/.exec(key) || /^([A-Za-z0-9_\-]+)\.([A-Za-z0-9_\-]+)\.([A-Za-z0-9_\-]+)$/.exec(key);
   },
 
 
@@ -1725,6 +2048,29 @@ var util = {
 
   isSecure: function() {
     return location.protocol === 'https:';
+  },
+
+  httpParseHeaders: function(headersStr) {
+    if(!headersStr) {
+      return false;
+    }
+    var headersHash = {};
+    var headersArr = headersStr.split("\r\n");
+    for(var i in headersArr) {
+      if(headersArr[i] == "") {
+        continue;
+      }
+      var tmp = headersArr[i].split(/: (.+)/);
+      headersHash[tmp[0]] = tmp[1];
+    }
+    return headersHash;
+  },
+
+  httpUrlHost: function(src) {
+     var matches = /^([^:]+):\/\/([^/]+)/g.exec(src)
+    if(matches.length > 0) {
+       return matches[1];
+    }
   }
 };
 

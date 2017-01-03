@@ -5,15 +5,15 @@ module.exports = function(grunt) {
     browserify: {
       dev: {
         src: ['lib/exports.js'],
-        dest: 'dist/peer.js'
+        dest: 'dist/peerloader.js'
       }
     },
 
     uglify: {
       prod: {
         options: { mangle: true },
-        src: 'dist/peer.js',
-        dest: 'dist/peer.min.js'
+        src: 'dist/peerloader.js',
+        dest: 'dist/peerloader.min.js'
       }
     },
 
@@ -23,16 +23,16 @@ module.exports = function(grunt) {
           banner: '/*! <%= pkg.name %> build:<%= pkg.version %>, development. '+
             'Copyright(c) 2013 Michelle Bu <michelle@michellebu.com> */'
         },
-        src: 'dist/peer.js',
-        dest: 'dist/peer.js',
+        src: 'dist/peerloader.js',
+        dest: 'dist/peerloader.js',
       },
       prod: {
         options: {
           banner: '/*! <%= pkg.name %> build:<%= pkg.version %>, production. '+
             'Copyright(c) 2013 Michelle Bu <michelle@michellebu.com> */'
         },
-        src: 'dist/peer.min.js',
-        dest: 'dist/peer.min.js',
+        src: 'dist/peerloader.min.js',
+        dest: 'dist/peerloader.min.js',
       }
     }
   });
